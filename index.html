@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Missing Children — Screenly</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A full-screen missing-child alert for digital signage — the newest open cases from the National Center for Missing & Exploited Children, one at a time."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='4' fill='%23c8361f'/%3E%3Ccircle cx='16' cy='13' r='5' fill='%23f6f2ea'/%3E%3Cpath d='M7 27c1.5-5 5-7.5 9-7.5s7.5 2.5 9 7.5z' fill='%23f6f2ea'/%3E%3C/svg%3E"
+    />
+    <link
+      rel="preload"
+      href="/static/fonts/bricolage-grotesque-latin-standard-normal.woff2?v=__ASSET_VERSION__"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/static/fonts/hanken-grotesk-latin-wght-normal.woff2?v=__ASSET_VERSION__"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/static/styles/main.css?v=__ASSET_VERSION__" />
+    <script src="/static/js/main.js?v=__ASSET_VERSION__" defer></script>
+  </head>
+  <body>
+    <main class="board">
+      <header class="masthead">
+        <p class="eyebrow">
+          <span class="eyebrow__flag">Missing</span>
+          <span id="mc-region">United States</span>
+        </p>
+        <p class="counter" id="mc-count" aria-live="off"></p>
+      </header>
+
+      <!-- Shown once main.ts has cases (html[data-state="ready"]). -->
+      <article class="card" id="mc-card" aria-live="polite">
+        <figure class="photo" id="mc-photo-frame" data-state="empty">
+          <span class="photo__initials" id="mc-initials" aria-hidden="true"></span>
+          <img class="photo__img" id="mc-photo" alt="" />
+        </figure>
+
+        <div class="details">
+          <p class="details__ask">Have you seen this child?</p>
+          <h1 class="details__name" id="mc-name"></h1>
+          <p class="details__duration" id="mc-duration"></p>
+
+          <dl class="facts">
+            <div class="facts__row">
+              <dt>Age now</dt>
+              <dd id="mc-age"></dd>
+            </div>
+            <div class="facts__row">
+              <dt>Missing since</dt>
+              <dd id="mc-date"></dd>
+            </div>
+            <div class="facts__row">
+              <dt>Missing from</dt>
+              <dd id="mc-place"></dd>
+            </div>
+          </dl>
+
+          <p class="details__poster">
+            Full poster
+            <a id="mc-poster" href="https://www.missingkids.org" target="_blank" rel="noopener noreferrer"
+              >missingkids.org</a
+            >
+          </p>
+        </div>
+      </article>
+
+      <!-- The no-JS / loading / offline screen: a standing appeal, never blank. -->
+      <section class="appeal" aria-labelledby="appeal-title">
+        <h2 class="appeal__title" id="appeal-title">Every child deserves a safe way home.</h2>
+        <p class="appeal__text">
+          If you have information about a missing child, call the National Center for Missing &amp;
+          Exploited Children, 24 hours a day.
+        </p>
+      </section>
+
+      <footer class="hotline">
+        <p class="hotline__call">
+          Call <strong class="hotline__number">1-800-THE-LOST</strong>
+          <span class="hotline__digits">(1-800-843-5678)</span> or 911
+        </p>
+        <p class="hotline__credit">
+          Case data from the
+          <a href="https://www.missingkids.org" target="_blank" rel="noopener noreferrer"
+            >National Center for Missing &amp; Exploited Children</a
+          >
+        </p>
+      </footer>
+
+      <a
+        class="brand"
+        href="https://www.screenly.io"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Screenly — opens in a new tab"
+      >
+        <img src="/static/images/screenly-logo.svg?v=__ASSET_VERSION__" alt="Screenly" />
+      </a>
+    </main>
+  </body>
+</html>

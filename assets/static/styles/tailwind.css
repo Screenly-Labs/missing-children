@@ -1,0 +1,419 @@
+/* =========================================================================
+   Screenly Missing Children — "The Bulletin"
+   A public-safety notice, not an advert: one child per step on a warm paper
+   ground, the photo mounted large like a poster plate, the name set big in
+   Bricolage Grotesque, and three plain facts beneath it (age now, missing
+   since, missing from). A signal-red "Missing" flag heads the page and a dark
+   ink band anchors the foot with the 24-hour hotline, so the call to action is
+   on screen at every step. Calm on purpose: one quiet fade per step, no motion
+   that competes with the face. Tuned for unattended signage: legible at
+   distance, no interaction, both orientations.
+   ========================================================================= */
+
+@import 'tailwindcss';
+/* Shared base (brand/font tokens + fluid root + the degraded-mode kill-switch),
+   the canonical @font-face set, and the standardized footer badge, all from
+   @screenly-labs/signage-kit. The design identity below stays per-app. */
+@import '@screenly-labs/signage-kit/styles/preset.css';
+@import '@screenly-labs/signage-kit/styles/fonts.css';
+@import '@screenly-labs/signage-kit/styles/brand.css';
+
+@theme {
+  --color-paper: #f6f2ea;
+  --color-paper-deep: #e9e2d4;
+  --color-ink: #1b1916;
+  --color-ink-dim: #5c564c;
+  --color-signal: #b8301b;
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: inherit;
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.18em;
+  }
+}
+
+@layer components {
+  /* Three rows: masthead, the case (or the appeal), the hotline band. */
+  .board {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh; /* fallback for engines below the svh floor (~2018 players) */
+    min-height: 100svh;
+    overflow: hidden;
+  }
+
+  .masthead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.4rem 2.2rem 0;
+  }
+
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.9em;
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-ink-dim);
+  }
+
+  .eyebrow__flag {
+    padding: 0.35em 0.75em 0.3em;
+    border-radius: 0.2em;
+    background-color: var(--color-signal);
+    color: var(--color-paper);
+    letter-spacing: 0.24em;
+  }
+
+  .counter {
+    font-weight: 500;
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-ink-dim);
+  }
+
+  /* ---- The case: photo plate beside the details (landscape), stacked in
+     portrait. */
+  .card {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 2.6rem;
+    padding: 1.2rem 2.2rem;
+    min-height: 0;
+  }
+
+  .photo {
+    position: relative;
+    flex: none;
+    /* The plate is sized off the shorter axis so it reads the same in both
+       orientations; 4:5 matches NCMEC's portrait photos. */
+    /* Explicit width/height rather than aspect-ratio, which is above the
+       support floor (Chrome 88 / Safari 15). */
+    height: min(64vh, 70vw);
+    width: calc(min(64vh, 70vw) * 0.8);
+    margin: 0;
+    overflow: hidden;
+    border-radius: 0.35rem;
+    background-color: var(--color-paper-deep);
+    box-shadow:
+      0 0 0 0.35rem var(--color-paper),
+      0 0 0 calc(0.35rem + 1px) rgb(27 25 22 / 0.18),
+      0 1.2rem 2.4rem -1rem rgb(27 25 22 / 0.35);
+  }
+
+  .photo__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 30%;
+    opacity: 0;
+    transition: opacity 400ms ease;
+  }
+
+  .photo[data-state='ready'] .photo__img {
+    opacity: 1;
+  }
+
+  /* Initials stand in while the photo loads, or when there is none. */
+  .photo__initials {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 4rem;
+    letter-spacing: 0.04em;
+    color: rgb(27 25 22 / 0.28);
+  }
+
+  .details {
+    min-width: 0;
+    max-width: 32rem;
+  }
+
+  .details__ask {
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+    color: var(--color-signal);
+  }
+
+  .details__name {
+    margin-top: 0.3rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 3.4rem;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+
+  .details__duration {
+    margin-top: 0.6rem;
+    font-weight: 500;
+    font-size: 1.05rem;
+    color: var(--color-ink-dim);
+  }
+
+  .facts {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.6rem;
+    padding-top: 1.3rem;
+    border-top: 2px solid var(--color-ink);
+  }
+
+  .facts__row {
+    display: grid;
+    grid-template-columns: 9.5rem 1fr;
+    align-items: baseline;
+    gap: 1rem;
+  }
+
+  .facts dt {
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-ink-dim);
+  }
+
+  .facts dd {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.3rem;
+  }
+
+  .details__poster {
+    margin-top: 1.5rem;
+    font-size: 0.78rem;
+    color: var(--color-ink-dim);
+    overflow-wrap: anywhere;
+  }
+
+  .details__poster a {
+    margin-left: 0.4em;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  /* ---- The appeal: what shows before data (no JS, loading) or when the feed
+     is unreachable or empty. Never a blank screen. */
+  .appeal {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 1.2rem;
+    padding: 1.2rem 2.2rem;
+    text-align: center;
+  }
+
+  .appeal__title {
+    max-width: 18em;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 3rem;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .appeal__text {
+    max-width: 30em;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: var(--color-ink-dim);
+    text-wrap: pretty;
+  }
+
+  html[data-state='ready'] .card {
+    display: flex;
+  }
+
+  html[data-state='ready'] .appeal {
+    display: none;
+  }
+
+  /* ---- The hotline band: always on screen. The right padding leaves room for
+     the fixed Screenly badge, which sits on this dark band (its wordmark is
+     white). */
+  .hotline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.4rem 2rem;
+    padding: 1.1rem 9rem 1.1rem 2.2rem;
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  .hotline__call {
+    font-size: 1.15rem;
+    font-weight: 500;
+  }
+
+  .hotline__number {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: 0.01em;
+    color: #fff;
+  }
+
+  .hotline__digits {
+    color: rgb(246 242 234 / 0.75);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hotline__credit {
+    font-size: 0.68rem;
+    color: rgb(246 242 234 / 0.75);
+  }
+
+  /* Portrait: stack the plate over the details and let the photo grow with the
+     width instead of the height. */
+  @media (orientation: portrait) {
+    .card {
+      flex-direction: column;
+      gap: 1.8rem;
+      text-align: center;
+    }
+
+    .photo {
+      width: min(62vw, 42vh);
+      height: calc(min(62vw, 42vh) * 1.25);
+    }
+
+    .details {
+      max-width: 34rem;
+    }
+
+    .facts__row {
+      grid-template-columns: 1fr 1fr;
+      text-align: left;
+    }
+
+    .hotline {
+      justify-content: center;
+      padding-right: 2.2rem;
+      padding-bottom: 3.2rem;
+      text-align: center;
+    }
+  }
+
+  /* Small portrait screens (the 480x800 Pi panel rotated): the root size is at
+     its floor here, so shrink the plate and the type so the hotline band stays
+     on screen. */
+  @media (orientation: portrait) and (max-height: 1000px) {
+    .card {
+      gap: 1rem;
+      padding-block: 0.8rem;
+    }
+
+    .photo {
+      width: 30vh;
+      height: 37.5vh;
+    }
+
+    .details__name {
+      font-size: 2.2rem;
+    }
+
+    .details__duration {
+      margin-top: 0.3rem;
+    }
+
+    .facts {
+      margin-top: 0.8rem;
+      padding-top: 0.7rem;
+      gap: 0.35rem;
+    }
+
+    .facts dd {
+      font-size: 1.1rem;
+    }
+
+    .details__poster {
+      margin-top: 0.7rem;
+    }
+
+    .hotline {
+      padding-top: 0.8rem;
+      padding-bottom: 2.6rem;
+    }
+  }
+
+  /* Short landscape screens (the 800x480 Pi panel): tighten the vertical rhythm
+     so the details never push the hotline off screen. */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .details__name {
+      font-size: 2.6rem;
+    }
+
+    .facts {
+      margin-top: 1rem;
+      padding-top: 0.9rem;
+      gap: 0.45rem;
+    }
+
+    .details__poster {
+      margin-top: 1rem;
+    }
+  }
+}
+
+@layer base {
+  /* One calm fade per step, replayed by main.ts toggling .is-entering. Gated
+     for reduced motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    .card.is-entering .photo {
+      animation: settle 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    .card.is-entering .details {
+      animation: settle 700ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms both;
+    }
+  }
+
+  @keyframes settle {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* =========================================================================
+   Degraded mode — old/weak signage players (html.legacy set by the inline gate
+   injected at build from @screenly-labs/signage-kit). The kit's kill-switch
+   drops every animation and transition; the photo fades in via a transition,
+   so give it its resting state explicitly once it has loaded.
+   ========================================================================= */
+html.legacy .photo[data-state='ready'] .photo__img {
+  opacity: 1;
+}
