@@ -3,7 +3,8 @@
 A full-screen missing-child alert for digital signage. It rotates through the
 newest open cases from the **National Center for Missing & Exploited Children**
 (NCMEC), nationwide or for one US state, one child at a time: their photo, their
-age now, when and where they went missing, and a link to the full NCMEC poster.
+age now, when and where they went missing, and a QR code for the full NCMEC
+poster.
 The 24-hour **1-800-THE-LOST** hotline is on screen at every step.
 
 Live: **https://missing-children.srly.io**
@@ -44,8 +45,13 @@ https://api.missingkids.org/missingkids/servlet/JSONDataServlet?action=publicSea
 
 It returns the 20 most recently reported open cases and answers CORS requests
 from any origin, so the static page calls it directly with no server and no API
-key. Photos load from `api.missingkids.org/photographs/…`, and every case links
-to its official poster at `missingkids.org/poster/…`.
+key. Photos load from `api.missingkids.org/photographs/…`, and every case shows
+a QR code for its official poster at `missingkids.org/poster/…`. The QR link
+carries `utm_source=missing-children&utm_medium=qr&utm_campaign=missing-child-poster`
+so the traffic these screens send is visible in NCMEC's analytics. The QR is
+generated in the browser with
+[`qrcode-generator`](https://github.com/kazuhikoarase/qrcode-generator) (as in
+`rss-reader`).
 
 The list is refetched every 30 minutes. A failed refresh keeps the current list
 on screen; if the very first fetch fails (offline signage), the page shows a

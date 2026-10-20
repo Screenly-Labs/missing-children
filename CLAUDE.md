@@ -55,7 +55,8 @@ bun run lint       # biome lint --error-on-warnings
   parsing (`readSettings`, `normalizeState`, `clampStep`), `searchUrl`, the
   response parser (`parseSearch`/`toChild`), NCMEC date parsing (hand-rolled;
   `Date.parse` of `"Oct 13, 2026 12:00:00 AM"` is engine-specific), name/city
-  casing (`tidyCase`), and display formatting. Add testable logic here.
+  casing (`tidyCase`), the poster-link UTM tags (`UTM`, `withUtm`), and display
+  formatting. Add testable logic here.
 - `assets/static/js/main.ts`: browser **entry**: fetch loop, rotation, render.
   Keep it **export-free** and free of top-level `await`.
 - `.well-known/signage-app.json`: the signage-app manifest (settings schema +
@@ -70,6 +71,11 @@ bun run lint       # biome lint --error-on-warnings
   (`toChild` refuses any other origin).
 - The hotline band (1-800-THE-LOST / 1-800-843-5678 / 911) and the NCMEC credit
   stay on screen in every state.
+- Every case carries a QR code for its NCMEC poster, encoding the UTM-tagged
+  URL. It uses error correction `L` (fewer modules for the long URL) and a
+  92px size floor so modules stay 2+ device px on the 800x480 panel. Keep both,
+  and re-check that it still decodes at the smallest resolutions after any
+  change to the QR block or the URL.
 - Test fixtures are fictional (`Jane Example`). Never commit screenshots or
   fixtures taken from real cases.
 

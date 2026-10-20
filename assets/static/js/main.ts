@@ -15,6 +15,7 @@ import '@screenly-labs/signage-kit/polyfills'
 import { trackPlayer } from '@screenly-labs/signage-kit/analytics'
 import { removeScreenlyBranding } from '@screenly-labs/signage-kit/branding'
 import { detectPlayer } from '@screenly-labs/signage-kit/profiler'
+import qrcode from 'qrcode-generator'
 import {
   type MissingChild,
   US_STATES,
@@ -25,7 +26,8 @@ import {
   formatPlace,
   parseSearch,
   readSettings,
-  searchUrl
+  searchUrl,
+  withUtm
 } from './cases'
 
 const FETCH_TIMEOUT_MS = 10_000
@@ -52,6 +54,17 @@ const initials = (name: string): string =>
     .slice(0, 2)
     .join('')
     .toUpperCase()
+
+// QR SVG for the poster link, built locally: the URL is encoded into modules,
+// never injected as markup. Error correction 'L': a screen never gets scuffed
+// like paper does, and the lower level keeps the module count (and so the
+// minimum readable size) down for the long UTM-tagged URL.
+const qrSvg = (link: string): string => {
+  const qr = qrcode(0, 'L')
+  qr.addData(link)
+  qr.make()
+  return qr.createSvgTag({ scalable: true, margin: 0 })
+}
 
 const renderPhoto = (child: MissingChild): void => {
   const frame = el('mc-photo-frame')
@@ -95,11 +108,12 @@ const render = (child: MissingChild): void => {
     text('mc-date', 'Unknown')
     text('mc-duration', '')
   }
+  const link = withUtm(child.posterUrl)
   const poster = el('mc-poster') as HTMLAnchorElement | null
-  if (poster) {
-    poster.href = child.posterUrl
-    poster.textContent = displayUrl(child.posterUrl)
-  }
+  if (poster) poster.href = link
+  const qr = el('mc-qr')
+  if (qr) qr.innerHTML = qrSvg(link)
+  text('mc-poster-url', displayUrl(child.posterUrl))
   text('mc-count', cases.length > 1 ? `${index + 1} / ${cases.length}` : '')
   renderPhoto(child)
 

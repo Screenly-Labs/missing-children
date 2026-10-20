@@ -14,6 +14,14 @@ export const POSTER_BASE = 'https://www.missingkids.org/poster'
 export const HOTLINE = '1-800-THE-LOST'
 export const HOTLINE_DIGITS = '1-800-843-5678'
 
+// UTM tags on the poster link the QR code encodes, so NCMEC can see traffic
+// arriving from screens running this app.
+export const UTM = {
+  utm_source: 'missing-children',
+  utm_medium: 'qr',
+  utm_campaign: 'missing-child-poster'
+} as const
+
 export const DEFAULT_STEP_SECONDS = 15
 export const MIN_STEP_SECONDS = 6
 export const MAX_STEP_SECONDS = 120
@@ -253,6 +261,13 @@ export const parseSearch = (data: unknown): MissingChild[] => {
 /** "Los Angeles, CA" — whichever parts are known. */
 export const formatPlace = (child: Pick<MissingChild, 'city' | 'state'>): string =>
   [child.city, child.state].filter(Boolean).join(', ')
+
+/** The poster URL with the UTM tags appended, for the QR code. */
+export const withUtm = (url: string): string => {
+  const out = new URL(url)
+  for (const [key, value] of Object.entries(UTM)) out.searchParams.set(key, value)
+  return out.toString()
+}
 
 /** The poster URL without the scheme, for printing on screen. */
 export const displayUrl = (url: string): string => url.replace(/^https?:\/\/(www\.)?/, '')

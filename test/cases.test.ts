@@ -15,7 +15,8 @@ import {
   readSettings,
   searchUrl,
   tidyCase,
-  toChild
+  toChild,
+  withUtm
 } from '../assets/static/js/cases'
 
 // Shaped like one entry of NCMEC's publicSearch `persons` array. Fictional.
@@ -186,6 +187,20 @@ describe('display helpers', () => {
     expect(formatPlace({ city: 'Springfield', state: 'IL' })).toBe('Springfield, IL')
     expect(formatPlace({ city: '', state: 'IL' })).toBe('IL')
     expect(formatPlace({ city: '', state: '' })).toBe('')
+  })
+
+  test('withUtm tags the poster link for the QR code', () => {
+    const url = new URL(withUtm('https://www.missingkids.org/poster/NCMC/1234567/1'))
+    expect(url.origin + url.pathname).toBe('https://www.missingkids.org/poster/NCMC/1234567/1')
+    expect(url.searchParams.get('utm_source')).toBe('missing-children')
+    expect(url.searchParams.get('utm_medium')).toBe('qr')
+    expect(url.searchParams.get('utm_campaign')).toBe('missing-child-poster')
+  })
+
+  test('withUtm keeps existing params and never duplicates a tag', () => {
+    const url = new URL(withUtm('https://www.missingkids.org/poster/NCMC/1/1?a=b&utm_medium=x'))
+    expect(url.searchParams.get('a')).toBe('b')
+    expect(url.searchParams.getAll('utm_medium')).toEqual(['qr'])
   })
 
   test('displayUrl drops the scheme and www', () => {
