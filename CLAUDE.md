@@ -31,6 +31,8 @@ Do not add a cached or bundled case list.
 ## Stack & conventions
 
 - **Bun** for everything (package manager, bundler, test runner). Never npm/npx.
+  CI pins **Bun 1.3.14**; update `bun.lock` with that version. Newer Bun writes
+  `lockfileVersion: 2`, which 1.3.14 can't read, and `--frozen-lockfile` fails.
 - **TypeScript**, strict. All browser JS is `.ts`, bundled by the kit.
 - **Tailwind CSS v4**, CSS-first (`@theme` in `assets/static/styles/tailwind.css`).
 - **Biome**: single quotes, no semicolons, 2-space, 100 cols. CSS is excluded.
