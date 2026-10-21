@@ -18,7 +18,9 @@ NCMEC's public search
 (`https://api.missingkids.org/missingkids/servlet/JSONDataServlet?action=publicSearch&search=new&subjToSearch=child[&missState=XX][&goToPage=N]`,
 CORS-open, 20 per page), reads `totalPages`, fetches one random page, and shows
 one child from it at random (`pickChild` prefers a case with a photo). A failed
-random page falls back to page 1.
+random page falls back to page 1. The page count is remembered per filter in
+`localStorage`, so later loads skip page 1 and fetch a random page directly
+(one request instead of two). That is a number, not a case list.
 
 ### No bundled fallback, on purpose
 
@@ -27,8 +29,13 @@ child who has been found. Failure modes:
 
 - the random page fails → pick from page 1 instead;
 - page 1 fails, or a filter has zero open cases → the standing **appeal** screen
-  (hotline + NCMEC credit, also the no-JS/pre-fetch screen) stays up until the
-  next reload.
+  (hotline + NCMEC credit) until the next reload. It is also the no-JS screen
+  (`<noscript>`).
+
+There is **no loading screen**: while fetching, the middle of the board is
+empty (masthead and hotline band only), and the child fades in. The appeal is
+`display: none` unless `html[data-state="offline"]`; don't show it while
+loading.
 
 Do not add a cached or bundled case list.
 
@@ -55,7 +62,8 @@ bun run lint       # biome lint --error-on-warnings
 ## Layout
 
 - `index.html`: page shell. Holds the case card (hidden until
-  `html[data-state="ready"]`) and the appeal (shown otherwise). Asset URLs carry
+  `html[data-state="ready"]`) and the appeal (shown only when
+  `html[data-state="offline"]`, or without JS). Asset URLs carry
   `?v=__ASSET_VERSION__`, stamped at build.
 - `assets/static/js/cases.ts`: **pure, exported, unit-tested** helpers: settings
   parsing (`readSettings`, `normalizeState`), `searchUrl`, the response parser

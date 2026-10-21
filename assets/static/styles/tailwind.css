@@ -251,10 +251,12 @@
     overflow-wrap: anywhere;
   }
 
-  /* ---- The appeal: what shows before data (no JS, loading) or when the feed
-     is unreachable or empty. Never a blank screen. */
+  /* ---- The appeal: shown only when there is nothing to show (feed
+     unreachable, no open cases, or no JS via the <noscript> rule in
+     index.html). While loading the middle stays empty, so a normal load goes
+     straight to the child with no interstitial. */
   .appeal {
-    display: grid;
+    display: none;
     align-content: center;
     justify-items: center;
     gap: 1.2rem;
@@ -284,14 +286,17 @@
     display: flex;
   }
 
-  html[data-state='ready'] .appeal {
-    display: none;
+  html[data-state='offline'] .appeal {
+    display: grid;
   }
 
   /* ---- The hotline band: always on screen. The Screenly badge lives inside
      it, in flow (see the unlayered override at the end), so its white wordmark
      always sits on the dark band, never on the paper. */
   .hotline {
+    /* Pinned to the last row: while loading, neither the card nor the appeal
+       is displayed, and the band would otherwise flow into the empty middle. */
+    grid-row: 3;
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
