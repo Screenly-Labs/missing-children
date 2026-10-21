@@ -1,11 +1,11 @@
 /* =========================================================================
    Screenly Missing Children — "The Bulletin"
-   A public-safety notice, not an advert: one child per step on a warm paper
+   A public-safety notice, not an advert: one child per load on a warm paper
    ground, the photo mounted large like a poster plate, the name set big in
    Bricolage Grotesque, and three plain facts beneath it (age now, missing
    since, missing from). A signal-red "Missing" flag heads the page and a dark
    ink band anchors the foot with the 24-hour hotline, so the call to action is
-   on screen at every step. Calm on purpose: one quiet fade per step, no motion
+   on screen. Calm on purpose: one quiet fade as the child appears, no motion
    that competes with the face. Tuned for unattended signage: legible at
    distance, no interaction, both orientations.
    ========================================================================= */
@@ -77,14 +77,6 @@
     background-color: var(--color-signal);
     color: var(--color-paper);
     letter-spacing: 0.24em;
-  }
-
-  .counter {
-    font-weight: 500;
-    font-size: 0.8rem;
-    letter-spacing: 0.12em;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-ink-dim);
   }
 
   /* ---- The case: photo plate beside the details (landscape), stacked in
@@ -444,14 +436,14 @@
 }
 
 @layer base {
-  /* One calm fade per step, replayed by main.ts toggling .is-entering. Gated
-     for reduced motion. */
+  /* One calm fade as the child appears, keyed off the ready flag main.ts sets.
+     Gated for reduced motion. */
   @media (prefers-reduced-motion: no-preference) {
-    .card.is-entering .photo {
+    html[data-state='ready'] .card .photo {
       animation: settle 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
     }
 
-    .card.is-entering .details {
+    html[data-state='ready'] .card .details {
       animation: settle 700ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms both;
     }
   }

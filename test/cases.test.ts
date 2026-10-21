@@ -1,9 +1,5 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  DEFAULT_STEP_SECONDS,
-  MAX_STEP_SECONDS,
-  MIN_STEP_SECONDS,
-  clampStep,
   daysSince,
   displayUrl,
   formatDate,
@@ -12,6 +8,10 @@ import {
   normalizeState,
   parseMissingDate,
   parseSearch,
+  parseTotalPages,
+  pickChild,
+  pickRandomIndex,
+  pickRandomPage,
   readSettings,
   searchUrl,
   tidyCase,
@@ -49,18 +49,9 @@ describe('settings', () => {
     expect(normalizeState(null)).toBeNull()
   })
 
-  test('stepSeconds is clamped and defaulted', () => {
-    expect(clampStep(null)).toBe(DEFAULT_STEP_SECONDS)
-    expect(clampStep('')).toBe(DEFAULT_STEP_SECONDS)
-    expect(clampStep('abc')).toBe(DEFAULT_STEP_SECONDS)
-    expect(clampStep('1')).toBe(MIN_STEP_SECONDS)
-    expect(clampStep('9999')).toBe(MAX_STEP_SECONDS)
-    expect(clampStep('20.4')).toBe(20)
-  })
-
-  test('reads both from the query string', () => {
-    expect(readSettings('?state=ny&stepSeconds=30')).toEqual({ state: 'NY', stepSeconds: 30 })
-    expect(readSettings('')).toEqual({ state: null, stepSeconds: DEFAULT_STEP_SECONDS })
+  test('reads the state from the query string', () => {
+    expect(readSettings('?state=ny')).toEqual({ state: 'NY' })
+    expect(readSettings('')).toEqual({ state: null })
   })
 })
 
@@ -76,6 +67,62 @@ describe('searchUrl', () => {
 
   test('a state scopes the search', () => {
     expect(new URL(searchUrl('CA')).searchParams.get('missState')).toBe('CA')
+  })
+
+  test('page 1 is the default; later pages add goToPage', () => {
+    expect(new URL(searchUrl(null)).searchParams.has('goToPage')).toBe(false)
+    expect(new URL(searchUrl(null, 1)).searchParams.has('goToPage')).toBe(false)
+    expect(new URL(searchUrl('TX', 7)).searchParams.get('goToPage')).toBe('7')
+  })
+})
+
+describe('random selection', () => {
+  test('pickRandomIndex stays in range for every rng value', () => {
+    for (const r of [0, 0.001, 0.5, 0.999999, 1]) {
+      const i = pickRandomIndex(20, () => r)
+      expect(Number.isInteger(i)).toBe(true)
+      expect(i).toBeGreaterThanOrEqual(0)
+      expect(i).toBeLessThan(20)
+    }
+    expect(pickRandomIndex(10, () => 0)).toBe(0)
+    expect(pickRandomIndex(10, () => 1)).toBe(9)
+  })
+
+  test('pickRandomIndex guards empty and invalid lengths', () => {
+    expect(pickRandomIndex(0)).toBe(0)
+    expect(pickRandomIndex(-3)).toBe(0)
+    expect(pickRandomIndex(Number.NaN)).toBe(0)
+  })
+
+  test('pickRandomPage covers 1..totalPages', () => {
+    expect(pickRandomPage(182, () => 0)).toBe(1)
+    expect(pickRandomPage(182, () => 0.999999)).toBe(182)
+    expect(pickRandomPage(182, () => 1)).toBe(182)
+    expect(pickRandomPage(0, () => 0.7)).toBe(1)
+  })
+
+  test('parseTotalPages reads a positive integer or 0', () => {
+    expect(parseTotalPages({ totalPages: 27 })).toBe(27)
+    expect(parseTotalPages({ totalPages: 0 })).toBe(0)
+    expect(parseTotalPages({ totalPages: '3' })).toBe(0)
+    expect(parseTotalPages({})).toBe(0)
+    expect(parseTotalPages(null)).toBe(0)
+  })
+
+  test('pickChild prefers cases with a photo', () => {
+    const noPhoto = toChild(person({ caseNumber: '1', hasThumbnail: false }))
+    const photo = toChild(person({ caseNumber: '2' }))
+    if (!noPhoto || !photo) throw new Error('fixture')
+    for (const r of [0, 0.5, 0.99]) {
+      expect(pickChild([noPhoto, photo, noPhoto], () => r)?.caseNumber).toBe('2')
+    }
+  })
+
+  test('pickChild falls back to photo-less cases, and null for none', () => {
+    const noPhoto = toChild(person({ hasThumbnail: false }))
+    if (!noPhoto) throw new Error('fixture')
+    expect(pickChild([noPhoto])).toBe(noPhoto)
+    expect(pickChild([])).toBeNull()
   })
 })
 
@@ -158,6 +205,15 @@ describe('toChild', () => {
     expect(toChild(person({ caseNumber: '' }))).toBeNull()
     expect(toChild(person({ firstName: '', lastName: '' }))).toBeNull()
     expect(toChild(person({ isChild: false }))).toBeNull()
+  })
+
+  test('rejects unidentified-persons (NCMU) records', () => {
+    expect(
+      toChild(person({ orgPrefix: 'NCMU', firstName: 'John', lastName: 'Doe 2000' }))
+    ).toBeNull()
+    expect(toChild(person({ orgPrefix: 'ncmu' }))).toBeNull()
+    // State clearinghouse cases (e.g. USVA) are real missing-child records.
+    expect(toChild(person({ orgPrefix: 'USVA' }))).not.toBeNull()
   })
 })
 

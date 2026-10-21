@@ -1,11 +1,12 @@
 # Screenly Missing Children App
 
-A full-screen missing-child alert for digital signage. It rotates through the
-newest open cases from the **National Center for Missing & Exploited Children**
-(NCMEC), nationwide or for one US state, one child at a time: their photo, their
+A full-screen missing-child alert for digital signage. Each time the page loads
+it shows **one child picked at random** from the open cases at the **National
+Center for Missing & Exploited Children** (NCMEC), nationwide or for one US
+state: their photo, their
 age now, when and where they went missing, and a QR code for the full NCMEC
 poster.
-The 24-hour **1-800-THE-LOST** hotline is on screen at every step.
+The 24-hour **1-800-THE-LOST** hotline is always on screen.
 
 Live: **https://missing-children.srly.io**
 
@@ -25,14 +26,12 @@ renders the form.
 | Parameter | Values | Default |
 | --- | --- | --- |
 | `state` | Two-letter US state or territory code (`CA`, `TX`, `PR`, …) | nationwide |
-| `stepSeconds` | Seconds per child, `6`–`120` | `15` |
 
 ```
-https://missing-children.srly.io/?state=CA&stepSeconds=20
+https://missing-children.srly.io/?state=CA
 ```
 
-An unknown `state` falls back to nationwide; an out-of-range `stepSeconds` is
-clamped.
+An unknown `state` falls back to nationwide.
 
 ## Where the data comes from
 
@@ -43,8 +42,12 @@ The page calls the public JSON search behind
 https://api.missingkids.org/missingkids/servlet/JSONDataServlet?action=publicSearch&search=new&subjToSearch=child[&missState=CA]
 ```
 
-It returns the 20 most recently reported open cases and answers CORS requests
-from any origin, so the static page calls it directly with no server and no API
+Results come 20 to a page, newest first. On load the page fetches page 1
+(which also reports how many pages there are), then one page chosen at random,
+and picks one child from it at random, preferring a case with a photo. So every
+open case gets screen time, not just the newest 20. The search answers CORS
+requests from any origin, so the static page calls it directly with no server
+and no API
 key. Photos load from `api.missingkids.org/photographs/…`, and every case shows
 a QR code for its official poster at `missingkids.org/poster/…`. The QR link
 carries `utm_source=missing-children&utm_medium=qr&utm_campaign=missing-child-poster`
@@ -53,9 +56,10 @@ generated in the browser with
 [`qrcode-generator`](https://github.com/kazuhikoarase/qrcode-generator) (as in
 `rss-reader`).
 
-The list is refetched every 30 minutes. A failed refresh keeps the current list
-on screen; if the very first fetch fails (offline signage), the page shows a
-standing appeal with the hotline and retries every minute. There is
+It's single-shot, like the quotes app: no rotation and no refresh timer. The
+player's reload brings the next child. If the random page fails, it falls back
+to a child from page 1; if nothing loads at all (offline signage), or a state
+has no open cases, the page shows a standing appeal with the hotline. There is
 **deliberately no bundled fallback list**: a stale record could show a child who
 has already been found.
 

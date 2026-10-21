@@ -5,26 +5,30 @@ Guidance for working in this repo.
 ## What this is
 
 A **static** full-screen missing-child alert for digital signage, hosted on
-**GitHub Pages**. It rotates through the newest open cases from NCMEC (the
-National Center for Missing & Exploited Children), optionally filtered to one US
-state. Same static template as `on-this-day` (its blueprint): no server, just
-HTML/CSS/JS built through `@screenly-labs/signage-kit`.
+**GitHub Pages**. It shows one child picked at random from the open cases at
+NCMEC (the National Center for Missing & Exploited Children), optionally
+filtered to one US state. Same static template as `on-this-day` (its blueprint): no server, just
+HTML/CSS/JS built through `@screenly-labs/signage-kit`. Like `quotes` and
+`on-this-day` it is **single-shot**: one random child per page load, no rotation
+and no refresh timer. The player's reload brings the next child. Keep it that
+way; don't add a client-side loop or anything pushed from a server.
 
-Data flow: the browser reads the launch settings (`?state=&stepSeconds=`),
-fetches NCMEC's public search
-(`https://api.missingkids.org/missingkids/servlet/JSONDataServlet?action=publicSearch&search=new&subjToSearch=child[&missState=XX]`,
-CORS-open, newest 20 cases), and shows one child per step. It refetches every
-30 min, keeping the current child on screen across a refresh when still listed.
+Data flow: the browser reads the launch settings (`?state=`), fetches page 1 of
+NCMEC's public search
+(`https://api.missingkids.org/missingkids/servlet/JSONDataServlet?action=publicSearch&search=new&subjToSearch=child[&missState=XX][&goToPage=N]`,
+CORS-open, 20 per page), reads `totalPages`, fetches one random page, and shows
+one child from it at random (`pickChild` prefers a case with a photo). A failed
+random page falls back to page 1.
 
 ### No bundled fallback, on purpose
 
 Unlike `on-this-day`, there is **no offline dataset**. A stale list could show a
 child who has been found. Failure modes:
 
-- refresh fails with a list already on screen → keep it, try again next cycle;
-- first fetch fails, or a filter has zero open cases → the standing **appeal**
-  screen (hotline + NCMEC credit, also the no-JS/pre-fetch screen), retrying
-  every minute.
+- the random page fails → pick from page 1 instead;
+- page 1 fails, or a filter has zero open cases → the standing **appeal** screen
+  (hotline + NCMEC credit, also the no-JS/pre-fetch screen) stays up until the
+  next reload.
 
 Do not add a cached or bundled case list.
 
@@ -54,23 +58,27 @@ bun run lint       # biome lint --error-on-warnings
   `html[data-state="ready"]`) and the appeal (shown otherwise). Asset URLs carry
   `?v=__ASSET_VERSION__`, stamped at build.
 - `assets/static/js/cases.ts`: **pure, exported, unit-tested** helpers: settings
-  parsing (`readSettings`, `normalizeState`, `clampStep`), `searchUrl`, the
-  response parser (`parseSearch`/`toChild`), NCMEC date parsing (hand-rolled;
+  parsing (`readSettings`, `normalizeState`), `searchUrl`, the response parser
+  (`parseSearch`/`toChild`/`parseTotalPages`), random selection
+  (`pickRandomIndex`/`pickRandomPage`/`pickChild`), NCMEC date parsing (hand-rolled;
   `Date.parse` of `"Oct 13, 2026 12:00:00 AM"` is engine-specific), name/city
   casing (`tidyCase`), the poster-link UTM tags (`UTM`, `withUtm`), and display
   formatting. Add testable logic here.
-- `assets/static/js/main.ts`: browser **entry**: fetch loop, rotation, render.
+- `assets/static/js/main.ts`: browser **entry**: fetch, pick, render once.
   Keep it **export-free** and free of top-level `await`.
 - `.well-known/signage-app.json`: the signage-app manifest (settings schema +
-  launch template `{?state,stepSeconds}`). `test/manifest.test.ts` checks the
-  `state` enum matches `US_STATES` and the `stepSeconds` bounds match the clamp,
-  so update both together.
+  launch template `{?state}`, no `playback` since it's single-shot).
+  `test/manifest.test.ts` checks the `state` enum matches `US_STATES`, so update
+  both together.
 
 ## Content rules
 
 - Show NCMEC data **unaltered** apart from casing. Never crop out, restyle or
   editorialize a case. Photos are hot-linked from `api.missingkids.org` only
   (`toChild` refuses any other origin).
+- Never show unidentified-persons records. The search mixes in NCMEC's `NCMU`
+  caseload (deceased "John Doe" cases with forensic reconstructions); `toChild`
+  drops them via `UNIDENTIFIED_PREFIXES`. Add any other such prefix there.
 - The hotline band (1-800-THE-LOST / 1-800-843-5678 / 911) and the NCMEC credit
   stay on screen in every state.
 - Every case carries a QR code for its NCMEC poster, encoding the UTM-tagged
@@ -86,7 +94,7 @@ bun run lint       # biome lint --error-on-warnings
 A public-safety notice on warm paper: signal-red `Missing` flag + area in the
 masthead, the photo as a large poster plate, the name in Bricolage Grotesque,
 three plain facts, and a dark ink hotline band at the foot (the white Screenly
-badge sits on it). One quiet fade per step, gated on reduced motion; the
+badge sits on it). One quiet fade as the child appears, gated on reduced motion; the
 degraded-mode resting state for the photo lives at the end of the stylesheet.
 Sizes are rem off the kit's fluid root; the photo plate uses explicit
 width/height (no `aspect-ratio`, which is above the support floor).

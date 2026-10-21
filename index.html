@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="A full-screen missing-child alert for digital signage — the newest open cases from the National Center for Missing & Exploited Children, one at a time."
+      content="A full-screen missing-child alert for digital signage — one child from the open cases at the National Center for Missing & Exploited Children, picked at random on each load."
     />
     <link
       rel="icon"
@@ -36,11 +36,10 @@
           <span class="eyebrow__flag">Missing</span>
           <span id="mc-region">United States</span>
         </p>
-        <p class="counter" id="mc-count" aria-live="off"></p>
       </header>
 
-      <!-- Shown once main.ts has cases (html[data-state="ready"]). -->
-      <article class="card" id="mc-card" aria-live="polite">
+      <!-- Shown once main.ts has picked a child (html[data-state="ready"]). -->
+      <article class="card" id="mc-card">
         <figure class="photo" id="mc-photo-frame" data-state="empty">
           <span class="photo__initials" id="mc-initials" aria-hidden="true"></span>
           <img class="photo__img" id="mc-photo" alt="" />
