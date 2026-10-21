@@ -99,7 +99,7 @@ degraded-mode resting state for the photo lives at the end of the stylesheet.
 Sizes are rem off the kit's fluid root; the photo plate uses explicit
 width/height (no `aspect-ratio`, which is above the support floor).
 
-Two layout invariants, both learned the hard way:
+Three layout invariants, all learned the hard way:
 
 - **The board is exactly one viewport tall** (`height: 100svh`, card row
   `minmax(0, 1fr)`), so the hotline band always sits on the bottom edge.
