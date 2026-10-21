@@ -99,6 +99,21 @@ degraded-mode resting state for the photo lives at the end of the stylesheet.
 Sizes are rem off the kit's fluid root; the photo plate uses explicit
 width/height (no `aspect-ratio`, which is above the support floor).
 
+Two layout invariants, both learned the hard way:
+
+- **The board is exactly one viewport tall** (`height: 100svh`, card row
+  `minmax(0, 1fr)`), so the hotline band always sits on the bottom edge.
+- **The Screenly badge lives inside the hotline band**, in flow (unlayered
+  `.hotline .brand` override at the end of the stylesheet). The kit pins
+  `.brand` to the viewport corner; on this light design that put the white
+  wordmark on the paper whenever the band wasn't flush with the bottom.
+- **The card fits itself.** Every size inside `.card` is in `--u`
+  (`1rem * --fit`), and `fitCard()` in `main.ts` steps `--fit` down from 1 to
+  0.45 until the photo and details fit the card's box (measured from the
+  children's rects, since a centred column overflows upwards too). It runs on
+  render, on `document.fonts.ready`, and on resize (once per frame). New sizes
+  inside the card must use `--u`, not `rem`, or they won't scale.
+
 ## Deploy
 
 Tag-driven: pushing a CalVer tag runs `deploy-pages.yml`. PRs run `ci.yml`.

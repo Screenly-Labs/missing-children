@@ -40,6 +40,9 @@ import {
 } from './cases'
 
 const FETCH_TIMEOUT_MS = 10_000
+// The card shrinks in FIT_STEP steps down to MIN_FIT of its designed size.
+const MIN_FIT = 0.45
+const FIT_STEP = 0.05
 
 const settings = readSettings(window.location.search)
 
@@ -93,6 +96,40 @@ const renderPhoto = (child: MissingChild): void => {
   img.src = child.photoUrl
 }
 
+// Does the card's content (photo + details) fit inside its own content box?
+// Measured from the children's boxes rather than scrollHeight, because a
+// centred flex column overflows upwards too, which scrollHeight never counts.
+const cardFits = (card: HTMLElement): boolean => {
+  const box = card.getBoundingClientRect()
+  const cs = getComputedStyle(card)
+  const top = box.top + Number.parseFloat(cs.paddingTop)
+  const bottom = box.bottom - Number.parseFloat(cs.paddingBottom)
+  const left = box.left + Number.parseFloat(cs.paddingLeft)
+  const right = box.right - Number.parseFloat(cs.paddingRight)
+  for (const child of Array.from(card.children)) {
+    const r = child.getBoundingClientRect()
+    if (r.top < top - 1 || r.bottom > bottom + 1 || r.left < left - 1 || r.right > right + 1) {
+      return false
+    }
+  }
+  return true
+}
+
+// Scale the card (every size inside it is in --u = 1rem * --fit) down until it
+// fits the space between the masthead and the hotline band. The CSS sizes are
+// the design at full size; this only ever shrinks, so the band and the badge
+// stay put at any window shape, including near-square desktop windows.
+const fitCard = (): void => {
+  const card = el('mc-card')
+  if (!card || document.documentElement.dataset.state !== 'ready') return
+  let fit = 1
+  card.style.setProperty('--fit', '1')
+  while (fit > MIN_FIT && !cardFits(card)) {
+    fit = Math.max(MIN_FIT, Math.round((fit - FIT_STEP) * 100) / 100)
+    card.style.setProperty('--fit', String(fit))
+  }
+}
+
 const render = (child: MissingChild): void => {
   const today = new Date()
   text('mc-name', child.name)
@@ -113,6 +150,9 @@ const render = (child: MissingChild): void => {
   text('mc-poster-url', displayUrl(child.posterUrl))
   renderPhoto(child)
   document.documentElement.dataset.state = 'ready'
+  fitCard()
+  // Webfont metrics differ from the fallback's, so fit again once they land.
+  if (document.fonts?.ready) document.fonts.ready.then(fitCard)
 }
 
 const fetchPage = async (page: number): Promise<unknown> => {
@@ -150,6 +190,17 @@ const init = (): void => {
   // user agent and referrer. No-op until a GA tag is added to index.html.
   trackPlayer(detectPlayer(), { app: 'missing-children', sendPageView: true })
   text('mc-region', settings.state ? US_STATES[settings.state] : 'United States')
+  // Re-fit when the window or the screen's orientation changes, at most once
+  // per frame.
+  let fitQueued = false
+  window.addEventListener('resize', () => {
+    if (fitQueued) return
+    fitQueued = true
+    window.requestAnimationFrame(() => {
+      fitQueued = false
+      fitCard()
+    })
+  })
   loadChild()
     .then((child) => {
       // No open cases for this filter: leave the standing appeal up.
