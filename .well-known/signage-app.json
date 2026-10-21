@@ -2,7 +2,7 @@
   "manifestVersion": "1",
   "id": "missing-children",
   "name": "Missing Children",
-  "description": "A full-screen missing-child alert for any display. Each time it loads it shows one child picked at random from the open cases at the National Center for Missing & Exploited Children, nationwide or for one US state, with a photo, the child's age, when and where they went missing, a QR code for the official poster, and the 24-hour 1-800-THE-LOST hotline.",
+  "description": "A full-screen missing-child alert for any display. Each time it loads it shows one child picked at random from the open cases at the National Center for Missing & Exploited Children, nationwide or for one US state, with a photo, the child's age, when and where they went missing, a QR code for the official poster, and the 24-hour 1-800-THE-LOST hotline. While an AMBER Alert is active for the area, the child from that alert is shown first.",
   "summary": "Help bring missing children home from any screen.",
   "vendor": "Screenly",
   "tags": [

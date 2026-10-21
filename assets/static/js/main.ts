@@ -8,7 +8,11 @@
 // child. Picking at random across every page, not just the newest 20, spreads
 // the exposure over all open cases.
 //
-// Flow: read the launch settings → fetch page 1 (which also reports how many
+// An active AMBER Alert comes first: while NCMEC lists one for this area, every
+// load shows a child from it (flagged "AMBER Alert"). Only when there is none,
+// or the lookup fails, does the board fall back to a random open case.
+//
+// Flow: read the launch settings → check for active AMBER Alerts → fetch page 1 (which also reports how many
 // pages there are) → fetch one random page → pick a child at random. If the
 // random page fails, fall back to a child from page 1. If nothing loads at all,
 // or the filter has no open cases, the standing appeal stays up. There is
@@ -25,14 +29,19 @@ import qrcode from 'qrcode-generator'
 import {
   type MissingChild,
   US_STATES,
+  amberDetailUrl,
+  amberUrl,
   daysSince,
   displayUrl,
   formatDate,
   formatDuration,
   formatPlace,
+  parseAmber,
+  parseAmberDetail,
   parseSearch,
   parseTotalPages,
   pickChild,
+  pickRandomIndex,
   pickRandomPage,
   readSettings,
   searchUrl,
@@ -132,6 +141,11 @@ const fitCard = (): void => {
 
 const render = (child: MissingChild): void => {
   const today = new Date()
+  if (child.amber) {
+    document.documentElement.dataset.alert = 'amber'
+    text('mc-flag', 'AMBER Alert')
+    text('mc-date-label', 'Alert issued')
+  }
   text('mc-name', child.name)
   text('mc-age', child.age === null ? 'Unknown' : String(child.age))
   text('mc-place', formatPlace(child) || 'Unknown')
@@ -155,11 +169,11 @@ const render = (child: MissingChild): void => {
   if (document.fonts?.ready) document.fonts.ready.then(fitCard)
 }
 
-const fetchPage = async (page: number): Promise<unknown> => {
+const fetchJson = async (url: string): Promise<unknown> => {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(searchUrl(settings.state, page), {
+    const res = await fetch(url, {
       credentials: 'omit',
       signal: controller.signal
     })
@@ -167,6 +181,31 @@ const fetchPage = async (page: number): Promise<unknown> => {
     return await res.json()
   } finally {
     clearTimeout(timer)
+  }
+}
+
+const fetchPage = (page: number): Promise<unknown> => fetchJson(searchUrl(settings.state, page))
+
+// A child from an active AMBER Alert for this area, or null when there is none
+// or NCMEC can't be reached (the random-case path then runs as usual). The list
+// has no photo or age, so the alert's detail record is fetched for them; without
+// it the initials card stands in.
+const loadAmber = async (): Promise<MissingChild | null> => {
+  let alerts: MissingChild[]
+  try {
+    alerts = parseAmber(await fetchJson(amberUrl(settings.state)))
+  } catch (error) {
+    console.error('Missing children: AMBER Alert check failed —', error)
+    return null
+  }
+  if (alerts.length === 0) return null
+  const child = alerts[pickRandomIndex(alerts.length)]
+  try {
+    const detail = parseAmberDetail(await fetchJson(amberDetailUrl(child.caseNumber)))
+    return { ...child, photoUrl: child.photoUrl ?? detail.photoUrl, age: child.age ?? detail.age }
+  } catch (error) {
+    console.error('Missing children: AMBER Alert photo failed —', error)
+    return child
   }
 }
 
@@ -248,7 +287,8 @@ const init = (): void => {
       fitCard()
     })
   })
-  loadChild()
+  loadAmber()
+    .then((alert) => alert ?? loadChild())
     .then((child) => {
       if (child) render(child)
       else showAppeal() // no open cases for this filter

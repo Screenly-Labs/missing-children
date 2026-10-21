@@ -1,11 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  amberDetailUrl,
+  amberUrl,
   daysSince,
   displayUrl,
   formatDate,
   formatDuration,
   formatPlace,
   normalizeState,
+  parseAmber,
+  parseAmberDetail,
   parseMissingDate,
   parseSearch,
   parseTotalPages,
@@ -15,6 +19,7 @@ import {
   readSettings,
   searchUrl,
   tidyCase,
+  toAmberChild,
   toChild,
   withUtm
 } from '../assets/static/js/cases'
@@ -133,6 +138,12 @@ describe('dates', () => {
     expect(parseMissingDate('Sep 30, 2001')).toBe('2001-09-30')
   })
 
+  test('parses the AMBER list numeric dates', () => {
+    expect(parseMissingDate('9/11/2006')).toBe('2006-09-11')
+    expect(parseMissingDate('10/20/2026 3:15:00 PM')).toBe('2026-10-20')
+    expect(parseMissingDate('13/1/2026')).toBeNull()
+  })
+
   test('rejects anything else', () => {
     expect(parseMissingDate('2026-10-13')).toBeNull()
     expect(parseMissingDate('Foo 1, 2020')).toBeNull()
@@ -181,7 +192,8 @@ describe('toChild', () => {
       city: 'Springfield',
       state: 'IL',
       photoUrl: 'https://api.missingkids.org/photographs/NCMC1234567c1.jpg',
-      posterUrl: 'https://www.missingkids.org/poster/NCMC/1234567/1'
+      posterUrl: 'https://www.missingkids.org/poster/NCMC/1234567/1',
+      amber: false
     })
   })
 
@@ -263,5 +275,104 @@ describe('display helpers', () => {
     expect(displayUrl('https://www.missingkids.org/poster/NCMC/1/1')).toBe(
       'missingkids.org/poster/NCMC/1/1'
     )
+  })
+})
+
+// Shaped like one entry of NCMEC's amberAlert `persons` array, per the field
+// names its own AMBER widget reads. Fictional.
+const alertPerson = (overrides: Record<string, unknown> = {}) => ({
+  amberId: 'AA1234',
+  personId: 2,
+  firstName: 'JANE',
+  lastName: 'EXAMPLE',
+  city: 'SPRINGFIELD',
+  state: 'il',
+  alertDate: 'Oct 20, 2026 3:15:00 PM',
+  issuedFor: 'Illinois',
+  ...overrides
+})
+
+describe('AMBER Alerts', () => {
+  test('amberUrl asks for active alerts, optionally for one state', () => {
+    const all = new URL(amberUrl(null))
+    expect(all.origin).toBe('https://api.missingkids.org')
+    expect(all.searchParams.get('action')).toBe('amberAlert')
+    expect(all.searchParams.get('missState')).toBe('')
+    expect(new URL(amberUrl('TX')).searchParams.get('missState')).toBe('TX')
+    const detail = new URL(amberDetailUrl('AA1234'))
+    expect(detail.searchParams.get('action')).toBe('amberDetail')
+    expect(detail.searchParams.get('amberId')).toBe('AA1234')
+  })
+
+  test('normalizes an alert record', () => {
+    expect(toAmberChild(alertPerson())).toEqual({
+      caseNumber: 'AA1234',
+      name: 'Jane Example',
+      age: null,
+      missingDate: '2026-10-20',
+      city: 'Springfield',
+      state: 'IL',
+      photoUrl: null,
+      posterUrl: 'https://www.missingkids.org/poster/AMBER/AA1234/2',
+      amber: true
+    })
+  })
+
+  test('accepts the alternate spellings', () => {
+    const child = toAmberChild(
+      alertPerson({
+        amberId: '',
+        caseNumber: 'AA9',
+        firstName: '',
+        lastName: '',
+        fullName: 'JANE Q EXAMPLE',
+        missingFrom: 'SPRINGFIELD, IL',
+        alertDate: '',
+        missingDate: '10/20/2026'
+      })
+    )
+    expect(child?.caseNumber).toBe('AA9')
+    expect(child?.name).toBe('Jane Q Example')
+    expect(child?.city).toBe('Springfield')
+    expect(child?.state).toBe('IL')
+    expect(child?.missingDate).toBe('2026-10-20')
+  })
+
+  test('never shows an abductor or companion as the child', () => {
+    expect(toAmberChild(alertPerson({ personType: 'Abductor' }))).toBeNull()
+    expect(toAmberChild(alertPerson({ role: "Abductor's Companion" }))).toBeNull()
+    expect(toAmberChild(alertPerson({ isChild: false }))).toBeNull()
+    expect(toAmberChild(alertPerson({ personType: 'child' }))).not.toBeNull()
+  })
+
+  test('rejects malformed records', () => {
+    expect(toAmberChild(null)).toBeNull()
+    expect(toAmberChild(alertPerson({ amberId: '' }))).toBeNull()
+    expect(toAmberChild(alertPerson({ firstName: '', lastName: '' }))).toBeNull()
+  })
+
+  test('parseAmber handles the empty response NCMEC sends with no alerts', () => {
+    expect(
+      parseAmber({ status: 'success', type: 'amberAlert', alertCount: 0, persons: [] })
+    ).toEqual([])
+    expect(parseAmber(null)).toEqual([])
+    const two = parseAmber({
+      persons: [alertPerson(), alertPerson(), alertPerson({ personId: 3 })]
+    })
+    expect(two.map((c) => c.posterUrl)).toEqual([
+      'https://www.missingkids.org/poster/AMBER/AA1234/2',
+      'https://www.missingkids.org/poster/AMBER/AA1234/3'
+    ])
+  })
+
+  test('parseAmberDetail reads the photo (on NCMEC only) and age', () => {
+    expect(
+      parseAmberDetail({ childBean: { imageUrl: '/photographs/AMBERAA1234c2.jpg', age: 9 } })
+    ).toEqual({ photoUrl: 'https://api.missingkids.org/photographs/AMBERAA1234c2.jpg', age: 9 })
+    const photo = (imageUrl: string) => parseAmberDetail({ childBean: { imageUrl } }).photoUrl
+    expect(photo('https://example.com/x.jpg')).toBeNull()
+    expect(photo('//example.com/x.jpg')).toBeNull()
+    expect(parseAmberDetail({})).toEqual({ photoUrl: null, age: null })
+    expect(parseAmberDetail(null)).toEqual({ photoUrl: null, age: null })
   })
 })

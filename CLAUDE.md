@@ -13,6 +13,16 @@ HTML/CSS/JS built through `@screenly-labs/signage-kit`. Like `quotes` and
 and no refresh timer. The player's reload brings the next child. Keep it that
 way; don't add a client-side loop or anything pushed from a server.
 
+Active **AMBER Alerts** come first. On each load the browser asks NCMEC for
+active alerts (`…/JSONDataServlet?action=amberAlert&missState=XX`, empty for
+nationwide). If there are any, it shows a child from one at random, flagged
+"AMBER Alert" with an "Alert issued" date, and fetches the alert's detail record
+(`action=amberDetail&amberId=…`) for the photo and age. Posters are
+`/poster/AMBER/{amberId}/{personId}`. No alerts, or a failed check, falls
+through to the random open case below; an AMBER lookup failure must never
+blank the board. `toAmberChild` drops any record that names an abductor or
+companion: only the child is ever shown.
+
 Data flow: the browser reads the launch settings (`?state=`), fetches page 1 of
 NCMEC's public search
 (`https://api.missingkids.org/missingkids/servlet/JSONDataServlet?action=publicSearch&search=new&subjToSearch=child[&missState=XX][&goToPage=N]`,
@@ -67,7 +77,8 @@ bun run lint       # biome lint --error-on-warnings
   `?v=__ASSET_VERSION__`, stamped at build.
 - `assets/static/js/cases.ts`: **pure, exported, unit-tested** helpers: settings
   parsing (`readSettings`, `normalizeState`), `searchUrl`, the response parser
-  (`parseSearch`/`toChild`/`parseTotalPages`), random selection
+  (`parseSearch`/`toChild`/`parseTotalPages`), the AMBER Alert parsers
+  (`amberUrl`/`parseAmber`/`toAmberChild`/`parseAmberDetail`), random selection
   (`pickRandomIndex`/`pickRandomPage`/`pickChild`), NCMEC date parsing (hand-rolled;
   `Date.parse` of `"Oct 13, 2026 12:00:00 AM"` is engine-specific), name/city
   casing (`tidyCase`), the poster-link UTM tags (`UTM`, `withUtm`), and display
