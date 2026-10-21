@@ -2,12 +2,18 @@
 // into a self-contained classic script with no exports, so it loads from a
 // plain <script>. Keep it export-free and free of top-level await.
 //
-// Flow: read the launch settings → fetch NCMEC's newest cases (optionally one
-// state) → rotate through them one per step → refetch every REFRESH_MS. A
-// failed refresh keeps the last good list on screen. If there has never been a
-// good list (offline from boot), the page shows the hotline card instead and
-// retries. There is deliberately no bundled fallback list: a stale record could
-// show a child who has since been found.
+// Single-shot, like quotes and on-this-day: each page load pulls one child at
+// random from NCMEC's open cases (optionally one state) and shows them. There is
+// no rotation and no refresh timer; the player's reload is what brings the next
+// child. Picking at random across every page, not just the newest 20, spreads
+// the exposure over all open cases.
+//
+// Flow: read the launch settings → fetch page 1 (which also reports how many
+// pages there are) → fetch one random page → pick a child at random. If the
+// random page fails, fall back to a child from page 1. If nothing loads at all,
+// or the filter has no open cases, the standing appeal stays up. There is
+// deliberately no bundled fallback list: a stale record could show a child who
+// has since been found.
 
 // Side-effect import: installs the replaceChildren shim for the older-browser
 // degraded mode. Must stay first so the shim is in place before any render.
@@ -15,6 +21,7 @@ import '@screenly-labs/signage-kit/polyfills'
 import { trackPlayer } from '@screenly-labs/signage-kit/analytics'
 import { removeScreenlyBranding } from '@screenly-labs/signage-kit/branding'
 import { detectPlayer } from '@screenly-labs/signage-kit/profiler'
+import qrcode from 'qrcode-generator'
 import {
   type MissingChild,
   US_STATES,
@@ -24,18 +31,17 @@ import {
   formatDuration,
   formatPlace,
   parseSearch,
+  parseTotalPages,
+  pickChild,
+  pickRandomPage,
   readSettings,
-  searchUrl
+  searchUrl,
+  withUtm
 } from './cases'
 
 const FETCH_TIMEOUT_MS = 10_000
-const REFRESH_MS = 30 * 60 * 1000
-const RETRY_MS = 60 * 1000
 
 const settings = readSettings(window.location.search)
-let cases: MissingChild[] = []
-let index = 0
-let stepTimer = 0
 
 const el = (id: string): HTMLElement | null => document.getElementById(id)
 
@@ -52,6 +58,17 @@ const initials = (name: string): string =>
     .slice(0, 2)
     .join('')
     .toUpperCase()
+
+// QR SVG for the poster link, built locally: the URL is encoded into modules,
+// never injected as markup. Error correction 'L': a screen never gets scuffed
+// like paper does, and the lower level keeps the module count (and so the
+// minimum readable size) down for the long UTM-tagged URL.
+const qrSvg = (link: string): string => {
+  const qr = qrcode(0, 'L')
+  qr.addData(link)
+  qr.make()
+  return qr.createSvgTag({ scalable: true, margin: 0 })
+}
 
 const renderPhoto = (child: MissingChild): void => {
   const frame = el('mc-photo-frame')
@@ -76,13 +93,6 @@ const renderPhoto = (child: MissingChild): void => {
   img.src = child.photoUrl
 }
 
-// Warm the cache for the next photo so the swap is instant on slow links.
-const preload = (child: MissingChild | undefined): void => {
-  if (!child?.photoUrl) return
-  const img = new Image()
-  img.src = child.photoUrl
-}
-
 const render = (child: MissingChild): void => {
   const today = new Date()
   text('mc-name', child.name)
@@ -95,89 +105,43 @@ const render = (child: MissingChild): void => {
     text('mc-date', 'Unknown')
     text('mc-duration', '')
   }
+  const link = withUtm(child.posterUrl)
   const poster = el('mc-poster') as HTMLAnchorElement | null
-  if (poster) {
-    poster.href = child.posterUrl
-    poster.textContent = displayUrl(child.posterUrl)
-  }
-  text('mc-count', cases.length > 1 ? `${index + 1} / ${cases.length}` : '')
+  if (poster) poster.href = link
+  const qr = el('mc-qr')
+  if (qr) qr.innerHTML = qrSvg(link)
+  text('mc-poster-url', displayUrl(child.posterUrl))
   renderPhoto(child)
-
-  // Replay the entrance on every step: drop the flag, force a reflow, re-add.
-  const card = el('mc-card')
-  if (card) {
-    card.classList.remove('is-entering')
-    void card.offsetWidth
-    card.classList.add('is-entering')
-  }
   document.documentElement.dataset.state = 'ready'
 }
 
-const step = (): void => {
-  if (cases.length === 0) return
-  index = (index + 1) % cases.length
-  render(cases[index])
-  preload(cases[(index + 1) % cases.length])
-}
-
-const startRotation = (): void => {
-  window.clearInterval(stepTimer)
-  stepTimer = window.setInterval(step, settings.stepSeconds * 1000)
-}
-
-const fetchCases = async (): Promise<MissingChild[]> => {
+const fetchPage = async (page: number): Promise<unknown> => {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(searchUrl(settings.state), {
+    const res = await fetch(searchUrl(settings.state, page), {
       credentials: 'omit',
       signal: controller.signal
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return parseSearch(await res.json())
+    return await res.json()
   } finally {
     clearTimeout(timer)
   }
 }
 
-const showOffline = (): void => {
-  window.clearInterval(stepTimer)
-  document.documentElement.dataset.state = 'offline'
-}
-
-const load = async (): Promise<void> => {
-  let next: MissingChild[]
+const loadChild = async (): Promise<MissingChild | null> => {
+  const first = await fetchPage(1)
+  const firstCases = parseSearch(first)
+  const page = pickRandomPage(parseTotalPages(first))
+  if (page <= 1) return pickChild(firstCases)
   try {
-    next = await fetchCases()
+    const picked = pickChild(parseSearch(await fetchPage(page)))
+    if (picked) return picked
   } catch (error) {
-    console.error('Missing children: fetch failed —', error)
-    if (cases.length === 0) {
-      showOffline()
-      window.setTimeout(load, RETRY_MS)
-    } else {
-      window.setTimeout(load, REFRESH_MS)
-    }
-    return
+    console.error(`Missing children: page ${page} failed, using page 1 —`, error)
   }
-
-  if (next.length === 0) {
-    // A successful but empty answer (no open cases for this filter) is real
-    // data, not an outage: clear the list rather than keep stale cases up.
-    cases = []
-    showOffline()
-  } else {
-    // Keep showing the same child across a refresh when they are still listed,
-    // so a refresh never cuts a step short or jumps back to the start.
-    const current = cases[index]?.posterUrl
-    cases = next
-    const kept = current ? next.findIndex((c) => c.posterUrl === current) : -1
-    index = kept >= 0 ? kept : 0
-    if (kept < 0) render(cases[index])
-    else text('mc-count', cases.length > 1 ? `${index + 1} / ${cases.length}` : '')
-    preload(cases[(index + 1) % cases.length])
-    startRotation()
-  }
-  window.setTimeout(load, REFRESH_MS)
+  return pickChild(firstCases)
 }
 
 const init = (): void => {
@@ -186,7 +150,14 @@ const init = (): void => {
   // user agent and referrer. No-op until a GA tag is added to index.html.
   trackPlayer(detectPlayer(), { app: 'missing-children', sendPageView: true })
   text('mc-region', settings.state ? US_STATES[settings.state] : 'United States')
-  void load()
+  loadChild()
+    .then((child) => {
+      // No open cases for this filter: leave the standing appeal up.
+      if (child) render(child)
+    })
+    .catch((error) => {
+      console.error('Missing children: fetch failed, showing the appeal —', error)
+    })
 }
 
 if (document.readyState === 'loading') {

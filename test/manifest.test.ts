@@ -4,13 +4,7 @@ import { describe, expect, test } from 'bun:test'
 // These assertions mirror the manifest schema's invariants so a malformed edit
 // fails CI here rather than being rejected by the store's index build.
 import manifest from '../.well-known/signage-app.json'
-import {
-  DEFAULT_STEP_SECONDS,
-  MAX_STEP_SECONDS,
-  MIN_STEP_SECONDS,
-  US_STATES,
-  readSettings
-} from '../assets/static/js/cases'
+import { US_STATES, readSettings } from '../assets/static/js/cases'
 
 const BASE_URL = 'https://missing-children.srly.io/'
 
@@ -63,15 +57,10 @@ describe('signage-app manifest', () => {
     })
   })
 
-  test('stepSeconds bounds match the app clamp', () => {
-    const step = manifest.settings.properties.stepSeconds
-    expect(step.default).toBe(DEFAULT_STEP_SECONDS)
-    expect(step.minimum).toBe(MIN_STEP_SECONDS)
-    expect(step.maximum).toBe(MAX_STEP_SECONDS)
-  })
-
-  test('user-adjustable pacing lives in settings, not playback', () => {
-    expect(manifest.playback.pacing).toBe('stepped')
-    expect('stepSeconds' in manifest.playback).toBe(false)
+  test('is single-shot: nothing to pace', () => {
+    // One random child per load, no rotation loop and no refresh timer, so the
+    // manifest carries no playback block (the player's reload brings the next).
+    expect('playback' in manifest).toBe(false)
+    expect(Object.keys(manifest.settings.properties)).toEqual(['state'])
   })
 })

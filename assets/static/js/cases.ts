@@ -14,9 +14,13 @@ export const POSTER_BASE = 'https://www.missingkids.org/poster'
 export const HOTLINE = '1-800-THE-LOST'
 export const HOTLINE_DIGITS = '1-800-843-5678'
 
-export const DEFAULT_STEP_SECONDS = 15
-export const MIN_STEP_SECONDS = 6
-export const MAX_STEP_SECONDS = 120
+// UTM tags on the poster link the QR code encodes, so NCMEC can see traffic
+// arriving from screens running this app.
+export const UTM = {
+  utm_source: 'missing-children',
+  utm_medium: 'qr',
+  utm_campaign: 'missing-child-poster'
+} as const
 
 // Two-letter codes NCMEC accepts as `missState`: the 50 states, DC, and the
 // inhabited territories.
@@ -79,6 +83,9 @@ export const US_STATES: Record<string, string> = {
   VI: 'U.S. Virgin Islands'
 }
 
+// Org prefixes whose records are unidentified remains, not missing children.
+export const UNIDENTIFIED_PREFIXES = new Set(['NCMU'])
+
 export const MONTHS_LONG = [
   'January',
   'February',
@@ -114,7 +121,6 @@ export interface MissingChild {
 export interface Settings {
   /** Two-letter state filter, or null for nationwide. */
   state: string | null
-  stepSeconds: number
 }
 
 /** Upper-case a valid state/territory code, or null for anything else. */
@@ -124,23 +130,16 @@ export const normalizeState = (raw: string | null | undefined): string | null =>
   return code in US_STATES ? code : null
 }
 
-export const clampStep = (raw: string | null | undefined): number => {
-  const n = Number(raw)
-  if (raw == null || raw === '' || !Number.isFinite(n)) return DEFAULT_STEP_SECONDS
-  return Math.min(MAX_STEP_SECONDS, Math.max(MIN_STEP_SECONDS, Math.round(n)))
-}
+/** Reads the launch-URL settings (`?state=CA`). */
+export const readSettings = (search: string): Settings => ({
+  state: normalizeState(new URLSearchParams(search).get('state'))
+})
 
-/** Reads the launch-URL settings (`?state=CA&stepSeconds=20`). */
-export const readSettings = (search: string): Settings => {
-  const params = new URLSearchParams(search)
-  return {
-    state: normalizeState(params.get('state')),
-    stepSeconds: clampStep(params.get('stepSeconds'))
-  }
-}
-
-/** NCMEC search URL for the newest cases, optionally scoped to one state. */
-export const searchUrl = (state: string | null): string => {
+/**
+ * NCMEC search URL for open cases, newest first, optionally scoped to one state.
+ * Results come 20 to a page; `page` is 1-based.
+ */
+export const searchUrl = (state: string | null, page = 1): string => {
   const params = new URLSearchParams({
     action: 'publicSearch',
     search: 'new',
@@ -149,6 +148,7 @@ export const searchUrl = (state: string | null): string => {
     LanguageId: 'en_US'
   })
   if (state) params.set('missState', state)
+  if (page > 1) params.set('goToPage', String(page))
   return `${API_BASE}${SEARCH_PATH}?${params.toString()}`
 }
 
@@ -220,6 +220,10 @@ export const toChild = (raw: unknown): MissingChild | null => {
   if (!caseNumber || !orgPrefix || !(first || last)) return null
   // Only child records: the same search can return adult (CSAW) cases.
   if (p.isChild === false) return null
+  // NCMU is NCMEC's unidentified-persons caseload (deceased "John Doe" cases
+  // with forensic reconstructions), mixed into the same search. Those are not
+  // missing children and must never be shown as one.
+  if (UNIDENTIFIED_PREFIXES.has(orgPrefix.toUpperCase())) return null
   const seq = typeof p.seqNumber === 'number' ? p.seqNumber : 1
   const image = str(p.imageUrl)
   return {
@@ -250,9 +254,47 @@ export const parseSearch = (data: unknown): MissingChild[] => {
   return out
 }
 
+/** The search response's `totalPages`, or 0 when absent or malformed. */
+export const parseTotalPages = (data: unknown): number => {
+  const n = data && typeof data === 'object' ? (data as { totalPages?: unknown }).totalPages : 0
+  return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : 0
+}
+
+/** A uniform integer in [0, length). Clamped, so rng() === 1 stays in range. */
+export const pickRandomIndex = (length: number, rng: () => number = Math.random): number => {
+  if (!Number.isFinite(length) || length < 1) return 0
+  return Math.min(length - 1, Math.floor(rng() * length))
+}
+
+/** A uniform page number in [1, totalPages]. */
+export const pickRandomPage = (totalPages: number, rng: () => number = Math.random): number =>
+  pickRandomIndex(totalPages, rng) + 1
+
+/**
+ * Picks one case at random, preferring cases that have a photo: a face is what
+ * a passerby can recognise, so a photo-less case is only shown when nothing
+ * else on the page has one.
+ */
+export const pickChild = (
+  cases: MissingChild[],
+  rng: () => number = Math.random
+): MissingChild | null => {
+  if (cases.length === 0) return null
+  const withPhoto = cases.filter((c) => c.photoUrl)
+  const pool = withPhoto.length > 0 ? withPhoto : cases
+  return pool[pickRandomIndex(pool.length, rng)]
+}
+
 /** "Los Angeles, CA" — whichever parts are known. */
 export const formatPlace = (child: Pick<MissingChild, 'city' | 'state'>): string =>
   [child.city, child.state].filter(Boolean).join(', ')
+
+/** The poster URL with the UTM tags appended, for the QR code. */
+export const withUtm = (url: string): string => {
+  const out = new URL(url)
+  for (const [key, value] of Object.entries(UTM)) out.searchParams.set(key, value)
+  return out.toString()
+}
 
 /** The poster URL without the scheme, for printing on screen. */
 export const displayUrl = (url: string): string => url.replace(/^https?:\/\/(www\.)?/, '')

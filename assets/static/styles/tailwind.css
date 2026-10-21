@@ -1,11 +1,11 @@
 /* =========================================================================
    Screenly Missing Children — "The Bulletin"
-   A public-safety notice, not an advert: one child per step on a warm paper
+   A public-safety notice, not an advert: one child per load on a warm paper
    ground, the photo mounted large like a poster plate, the name set big in
    Bricolage Grotesque, and three plain facts beneath it (age now, missing
    since, missing from). A signal-red "Missing" flag heads the page and a dark
    ink band anchors the foot with the 24-hour hotline, so the call to action is
-   on screen at every step. Calm on purpose: one quiet fade per step, no motion
+   on screen. Calm on purpose: one quiet fade as the child appears, no motion
    that competes with the face. Tuned for unattended signage: legible at
    distance, no interaction, both orientations.
    ========================================================================= */
@@ -77,14 +77,6 @@
     background-color: var(--color-signal);
     color: var(--color-paper);
     letter-spacing: 0.24em;
-  }
-
-  .counter {
-    font-weight: 500;
-    font-size: 0.8rem;
-    letter-spacing: 0.12em;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-ink-dim);
   }
 
   /* ---- The case: photo plate beside the details (landscape), stacked in
@@ -204,17 +196,51 @@
     font-size: 1.3rem;
   }
 
-  .details__poster {
+  /* QR code for the full NCMEC poster, so a passerby can take the case with
+     them. The code sits on a white tile (scanners want a light quiet zone). */
+  .poster {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
     margin-top: 1.5rem;
-    font-size: 0.78rem;
-    color: var(--color-ink-dim);
-    overflow-wrap: anywhere;
+    text-decoration: none;
   }
 
-  .details__poster a {
-    margin-left: 0.4em;
+  /* The px floor keeps every module at 2+ device pixels on the smallest
+     panels, where the rem size alone would be too small to scan. */
+  .poster__qr {
+    flex: none;
+    width: max(5.2rem, 92px);
+    height: max(5.2rem, 92px);
+    padding: 0.35rem;
+    border-radius: 0.2rem;
+    background-color: #fff;
+    box-shadow: 0 0 0 1px rgb(27 25 22 / 0.18);
+  }
+
+  .poster__qr svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .poster__text {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .poster__label {
     font-weight: 600;
+    font-size: 0.85rem;
     color: var(--color-ink);
+  }
+
+  .poster__url {
+    font-size: 0.68rem;
+    color: var(--color-ink-dim);
+    overflow-wrap: anywhere;
   }
 
   /* ---- The appeal: what shows before data (no JS, loading) or when the feed
@@ -301,12 +327,16 @@
     }
 
     .photo {
-      width: min(62vw, 42vh);
-      height: calc(min(62vw, 42vh) * 1.25);
+      width: min(56vw, 34vh);
+      height: calc(min(56vw, 34vh) * 1.25);
     }
 
     .details {
       max-width: 34rem;
+    }
+
+    .poster {
+      justify-content: center;
     }
 
     .facts__row {
@@ -354,8 +384,13 @@
       font-size: 1.1rem;
     }
 
-    .details__poster {
+    .poster {
       margin-top: 0.7rem;
+    }
+
+    .poster__qr {
+      width: max(4.4rem, 92px);
+      height: max(4.4rem, 92px);
     }
 
     .hotline {
@@ -367,31 +402,48 @@
   /* Short landscape screens (the 800x480 Pi panel): tighten the vertical rhythm
      so the details never push the hotline off screen. */
   @media (orientation: landscape) and (max-height: 560px) {
+    .masthead {
+      padding-top: 1rem;
+    }
+
+    .card {
+      padding-block: 0.5rem;
+    }
+
+    .hotline {
+      padding-block: 0.7rem;
+    }
+
     .details__name {
       font-size: 2.6rem;
     }
 
     .facts {
-      margin-top: 1rem;
-      padding-top: 0.9rem;
-      gap: 0.45rem;
+      margin-top: 0.8rem;
+      padding-top: 0.7rem;
+      gap: 0.3rem;
     }
 
-    .details__poster {
-      margin-top: 1rem;
+    .poster {
+      margin-top: 0.7rem;
+    }
+
+    .poster__qr {
+      width: max(4.4rem, 92px);
+      height: max(4.4rem, 92px);
     }
   }
 }
 
 @layer base {
-  /* One calm fade per step, replayed by main.ts toggling .is-entering. Gated
-     for reduced motion. */
+  /* One calm fade as the child appears, keyed off the ready flag main.ts sets.
+     Gated for reduced motion. */
   @media (prefers-reduced-motion: no-preference) {
-    .card.is-entering .photo {
+    html[data-state='ready'] .card .photo {
       animation: settle 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
     }
 
-    .card.is-entering .details {
+    html[data-state='ready'] .card .details {
       animation: settle 700ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms both;
     }
   }

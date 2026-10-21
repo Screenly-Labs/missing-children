@@ -2,7 +2,7 @@
   "manifestVersion": "1",
   "id": "missing-children",
   "name": "Missing Children",
-  "description": "A full-screen missing-child alert for any display. It rotates through the newest open cases from the National Center for Missing & Exploited Children, nationwide or for one US state, each with a photo, the child's age, when and where they went missing, and the 24-hour 1-800-THE-LOST hotline.",
+  "description": "A full-screen missing-child alert for any display. Each time it loads it shows one child picked at random from the open cases at the National Center for Missing & Exploited Children, nationwide or for one US state, with a photo, the child's age, when and where they went missing, a QR code for the official poster, and the 24-hour 1-800-THE-LOST hotline.",
   "summary": "Help bring missing children home from any screen.",
   "vendor": "Screenly",
   "tags": [
@@ -12,11 +12,6 @@
   "homepage": "https://missing-children.srly.io/",
   "source": "https://github.com/Screenly-Labs/missing-children",
   "support": "https://github.com/Screenly-Labs/missing-children/issues",
-  "playback": {
-    "pacing": "stepped",
-    "loops": true,
-    "refreshIntervalS": 1800
-  },
   "settings": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -143,19 +138,11 @@
           "Wisconsin",
           "Wyoming"
         ]
-      },
-      "stepSeconds": {
-        "type": "integer",
-        "title": "Seconds per child",
-        "default": 15,
-        "minimum": 6,
-        "maximum": 120,
-        "x-widget": "number"
       }
     }
   },
   "launch": {
     "baseUrl": "https://missing-children.srly.io/",
-    "template": "{?state,stepSeconds}"
+    "template": "{?state}"
   }
 }
