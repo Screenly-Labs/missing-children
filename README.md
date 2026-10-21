@@ -35,6 +35,19 @@ An unknown `state` falls back to nationwide.
 
 ## Where the data comes from
 
+**Active AMBER Alerts come first.** Each load checks NCMEC's active
+[AMBER Alerts](https://www.missingkids.org/gethelpnow/amber) for the configured
+state (or nationwide):
+
+```
+https://api.missingkids.org/missingkids/servlet/JSONDataServlet?action=amberAlert&missState=CA
+```
+
+While an alert is active, the board shows a child from it, flagged **AMBER
+Alert**, with the alert's photo and poster. AMBER Alerts are usually resolved
+within hours; with none active (the usual case) the app shows a random open
+case as below.
+
 The page calls the public JSON search behind
 [missingkids.org](https://www.missingkids.org/gethelpnow/search):
 

@@ -83,6 +83,14 @@ export const US_STATES: Record<string, string> = {
   VI: 'U.S. Virgin Islands'
 }
 
+// Active AMBER Alerts live under this pseudo org prefix: their posters are
+// `/poster/AMBER/{amberId}/{personId}`.
+export const AMBER_PREFIX = 'AMBER'
+
+// Roles an AMBER Alert record can name besides the child. Such a record is
+// never shown as "Have you seen this child?".
+const NOT_A_CHILD = /abductor|companion|suspect/i
+
 // Org prefixes whose records are unidentified remains, not missing children.
 export const UNIDENTIFIED_PREFIXES = new Set(['NCMU'])
 
@@ -116,6 +124,8 @@ export interface MissingChild {
   photoUrl: string | null
   /** The public NCMEC poster for this case. */
   posterUrl: string
+  /** True for a child in an active AMBER Alert. */
+  amber: boolean
 }
 
 export interface Settings {
@@ -152,13 +162,36 @@ export const searchUrl = (state: string | null, page = 1): string => {
   return `${API_BASE}${SEARCH_PATH}?${params.toString()}`
 }
 
+/** NCMEC's active AMBER Alerts, optionally scoped to one state. */
+export const amberUrl = (state: string | null): string => {
+  const params = new URLSearchParams({
+    action: 'amberAlert',
+    missState: state ?? '',
+    LanguageId: 'en_US'
+  })
+  return `${API_BASE}${SEARCH_PATH}?${params.toString()}`
+}
+
+/** The detail record for one AMBER Alert, which carries the photo. */
+export const amberDetailUrl = (amberId: string): string => {
+  const params = new URLSearchParams({ action: 'amberDetail', amberId, LanguageId: 'en_US' })
+  return `${API_BASE}${SEARCH_PATH}?${params.toString()}`
+}
+
 /**
- * Parses NCMEC's `"Oct 13, 2026 12:00:00 AM"` into `YYYY-MM-DD`. Done by hand
+ * Parses NCMEC's `"Oct 13, 2026 12:00:00 AM"` (or the AMBER list's `10/13/2026`)
+ * into `YYYY-MM-DD`. Done by hand
  * because `Date.parse` of that format is engine-specific, and the date is a
  * calendar date with no meaningful time or zone.
  */
 export const parseMissingDate = (raw: unknown): string | null => {
   if (typeof raw !== 'string') return null
+  const numeric = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\b/.exec(raw.trim())
+  if (numeric) {
+    const [month, day] = [Number(numeric[1]), Number(numeric[2])]
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null
+    return `${numeric[3]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
   const m = /^([A-Za-z]{3})[a-z]*\.? +(\d{1,2}), +(\d{4})/.exec(raw.trim())
   if (!m) return null
   const month = MONTHS_SHORT.findIndex((s) => s.toLowerCase() === m[1].toLowerCase())
@@ -234,7 +267,76 @@ export const toChild = (raw: unknown): MissingChild | null => {
     city: tidyCase(str(p.missingCity)),
     state: str(p.missingState).toUpperCase(),
     photoUrl: p.hasThumbnail !== false && image.startsWith('/') ? `${API_BASE}${image}` : null,
-    posterUrl: `${POSTER_BASE}/${encodeURIComponent(orgPrefix)}/${encodeURIComponent(caseNumber)}/${seq}`
+    posterUrl: `${POSTER_BASE}/${encodeURIComponent(orgPrefix)}/${encodeURIComponent(caseNumber)}/${seq}`,
+    amber: false
+  }
+}
+
+/** A photo path from NCMEC, made absolute; null for anything off-origin. */
+const ncmecPhoto = (raw: unknown): string | null => {
+  const path = str(raw)
+  return path.startsWith('/') && !path.startsWith('//') ? `${API_BASE}${path}` : null
+}
+
+/**
+ * Validates and normalizes one entry of the amberAlert response's `persons`.
+ * The field names follow NCMEC's own AMBER widget, which accepts either spelling
+ * of the id, name and place. The list carries no photo (see `amberPhotoUrl`).
+ */
+export const toAmberChild = (raw: unknown): MissingChild | null => {
+  if (!raw || typeof raw !== 'object') return null
+  const p = raw as Record<string, unknown>
+  const id = str(p.amberId) || str(p.caseNumber)
+  const name = str(p.fullName) || [str(p.firstName), str(p.lastName)].filter(Boolean).join(' ')
+  if (!id || !name) return null
+  if (p.isChild === false) return null
+  for (const role of [p.personType, p.role, p.relationship, p.subjectType]) {
+    if (typeof role === 'string' && NOT_A_CHILD.test(role)) return null
+  }
+  const seq = typeof p.personId === 'number' || typeof p.personId === 'string' ? p.personId : 1
+  // `missingFrom` is "City ST"; otherwise separate city/state fields.
+  const from = /^(.+?),?\s+([A-Za-z]{2})$/.exec(str(p.missingFrom))
+  return {
+    caseNumber: id,
+    name: tidyCase(name),
+    age: typeof p.age === 'number' && p.age > 0 ? p.age : null,
+    missingDate:
+      parseMissingDate(p.alertDate) ?? parseMissingDate(p.missingDate) ?? parseMissingDate(p.date),
+    city: tidyCase(from ? from[1] : str(p.city) || str(p.missingCity)),
+    state: (from ? from[2] : str(p.state) || str(p.missingState)).toUpperCase(),
+    photoUrl: ncmecPhoto(p.imageUrl),
+    posterUrl: `${POSTER_BASE}/${AMBER_PREFIX}/${encodeURIComponent(id)}/${encodeURIComponent(String(seq))}`,
+    amber: true
+  }
+}
+
+/** Parses an amberAlert response into the children in active alerts. */
+export const parseAmber = (data: unknown): MissingChild[] => {
+  if (!data || typeof data !== 'object') return []
+  const persons = (data as { persons?: unknown }).persons
+  if (!Array.isArray(persons)) return []
+  const seen = new Set<string>()
+  const out: MissingChild[] = []
+  for (const raw of persons) {
+    const child = toAmberChild(raw)
+    if (!child || seen.has(child.posterUrl)) continue
+    seen.add(child.posterUrl)
+    out.push(child)
+  }
+  return out
+}
+
+/**
+ * The photo and age from an amberDetail response's `childBean`, which the
+ * alert list lacks. Anything missing or malformed comes back null.
+ */
+export const parseAmberDetail = (data: unknown): Pick<MissingChild, 'photoUrl' | 'age'> => {
+  const bean = data && typeof data === 'object' ? (data as { childBean?: unknown }).childBean : null
+  if (!bean || typeof bean !== 'object') return { photoUrl: null, age: null }
+  const b = bean as Record<string, unknown>
+  return {
+    photoUrl: ncmecPhoto(b.imageUrl),
+    age: typeof b.age === 'number' && b.age > 0 ? b.age : null
   }
 }
 
