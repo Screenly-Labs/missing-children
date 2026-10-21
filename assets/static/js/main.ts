@@ -273,7 +273,7 @@ const showAppeal = (): void => {
 const init = (): void => {
   removeScreenlyBranding()
   // Report which player is showing this. A static app can only profile from the
-  // user agent and referrer. No-op until a GA tag is added to index.html.
+  // user agent and referrer.
   trackPlayer(detectPlayer(), { app: 'missing-children', sendPageView: true })
   text('mc-region', settings.state ? US_STATES[settings.state] : 'United States')
   // Re-fit when the window or the screen's orientation changes, at most once
