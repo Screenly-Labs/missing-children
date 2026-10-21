@@ -170,10 +170,50 @@ const fetchPage = async (page: number): Promise<unknown> => {
   }
 }
 
+// The page count from the last load, per filter. Remembering it lets the next
+// load fetch one random page straight away instead of page 1 first, halving
+// the time to first content. It is only a number, never a case: every case
+// shown is always fetched live.
+const pagesKey = `missing-children:pages:${settings.state ?? 'US'}`
+
+const readCachedPages = (): number => {
+  try {
+    const n = Number(window.localStorage.getItem(pagesKey))
+    return Number.isInteger(n) && n > 0 ? n : 0
+  } catch {
+    return 0 // storage disabled (private mode, locked-down players)
+  }
+}
+
+const storePages = (n: number): void => {
+  if (n < 1) return
+  try {
+    window.localStorage.setItem(pagesKey, String(n))
+  } catch {
+    // Not fatal: the next load just takes the page-1 path again.
+  }
+}
+
 const loadChild = async (): Promise<MissingChild | null> => {
+  // Fast path: one request, to a random page within the remembered count. If
+  // the count has shrunk since, that page comes back empty and we fall through.
+  const cached = readCachedPages()
+  if (cached > 1) {
+    try {
+      const data = await fetchPage(pickRandomPage(cached))
+      storePages(parseTotalPages(data))
+      const picked = pickChild(parseSearch(data))
+      if (picked) return picked
+    } catch (error) {
+      console.error('Missing children: cached page failed, starting from page 1 —', error)
+    }
+  }
+
   const first = await fetchPage(1)
   const firstCases = parseSearch(first)
-  const page = pickRandomPage(parseTotalPages(first))
+  const total = parseTotalPages(first)
+  storePages(total)
+  const page = pickRandomPage(total)
   if (page <= 1) return pickChild(firstCases)
   try {
     const picked = pickChild(parseSearch(await fetchPage(page)))
@@ -182,6 +222,13 @@ const loadChild = async (): Promise<MissingChild | null> => {
     console.error(`Missing children: page ${page} failed, using page 1 —`, error)
   }
   return pickChild(firstCases)
+}
+
+// Nothing to show (offline, NCMEC unreachable, or no open cases for this
+// filter): reveal the standing appeal. It is hidden while loading, so a normal
+// load goes straight from the empty frame to the child.
+const showAppeal = (): void => {
+  document.documentElement.dataset.state = 'offline'
 }
 
 const init = (): void => {
@@ -203,11 +250,12 @@ const init = (): void => {
   })
   loadChild()
     .then((child) => {
-      // No open cases for this filter: leave the standing appeal up.
       if (child) render(child)
+      else showAppeal() // no open cases for this filter
     })
     .catch((error) => {
       console.error('Missing children: fetch failed, showing the appeal —', error)
+      showAppeal()
     })
 }
 
